@@ -67,11 +67,12 @@ module HTTParty #:nodoc:
             Cache.logger.debug "CACHE -- GET #{path}#{options[:query]}"
             return cache.get(key)
           else
+            cache.cleanup!(key)
             Cache.logger.debug "/!\\ NETWORK -- GET #{path}#{options[:query]}"
 
             begin
               response = get_without_caching(path, options)
-              timeout = response.headers['cache-control'] && response.headers['cache-control'][/max-age=(\d+)/, 1].to_i
+              timeout = response.headers['cache-control'] && response.headers['cache-control'][/max-age=(\d+)/, 1].to_i()
               cache.set(key, response, :timeout => timeout) if response.code.to_s == "200" # this works for string and integer response codes
               return response
             rescue
@@ -108,6 +109,10 @@ module HTTParty #:nodoc:
 
       def get(key, force=false)
         @store.get encode(key) if !stale?(key) || force
+      end
+
+      def cleanup!(key)
+        @store.cleanup!(encode(key))
       end
 
       def set(key, value, options={})
@@ -165,6 +170,10 @@ module HTTParty #:nodoc:
         %w{set get exists? stale?}.each do |method_name|
           define_method(method_name) { raise NoMethodError, "Please implement method #{method_name} in your store class" }
         end
+
+        def cleanup!(key)
+          #noop
+        end
       end
 
       # ==== Store objects in memory
@@ -215,28 +224,42 @@ module HTTParty #:nodoc:
           FileUtils.mkdir_p( @path )
           self
         end
+
         def set(key, value, options = {})
           Cache.logger.info("Cache: set (#{key})")
-          File.open( @path.join(key), 'w' ) { |file| file << Base64.encode64(Marshal.dump(value.deep_dup))  }
+          timeout_value = options[:timeout] || @timeout
+          File.open( @path.join(key), 'w' ) { |file| file <<  Base64.encode64(Marshal.dump([Time.now, timeout_value, value.deep_dup])) }
           true
         end
+
         def get(key)
-          data = Marshal.load(Base64.decode64(File.read( @path.join(key))))
+          data = load_data(key)
           Cache.logger.info("Cache: #{data.nil? ? "miss" : "hit"} (#{key})")
-          data
+          data[2]
         end
+
+        def load_data(key)
+          data = Marshal.load(Base64.decode64(File.read( @path.join(key))))
+        end
+
         def exists?(key)
           File.exists?( @path.join(key) )
         end
+
         def stale?(key)
           return true unless exists?(key)
-          Time.now - created(key) > @timeout
+          data = load_data(key)
+          (Time.now - data[0]) > data[1]
+
         end
-        private
-        def created(key)
-          File.mtime( @path.join(key) )
+
+        def cleanup!(key)
+          Cache.logger.info("Cache cleanup: #{key}")
+          File.delete(@path.join(key)) if exists?(key)
         end
+
       end
     end
   end
 end
+
