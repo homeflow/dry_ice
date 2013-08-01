@@ -217,7 +217,7 @@ module HTTParty #:nodoc:
         end
         def set(key, value, options = {})
           Cache.logger.info("Cache: set (#{key})")
-          File.open( @path.join(key), 'w' ) { |file| file << Base64.encode64(Marshal.dump(value))  }
+          File.open( @path.join(key), 'w' ) { |file| file << Base64.encode64(Marshal.dump(value.deep_dup))  }
           true
         end
         def get(key)
