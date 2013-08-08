@@ -3,7 +3,7 @@ $:.push File.expand_path("../lib", __FILE__)
 require "dry_ice/version"
 
 Gem::Specification.new do |s|
-  s.name        = "homeflow-httparty-icebox"
+  s.name        = "dry_ice"
   s.version     = Httparty::DryIce::VERSION
   s.platform    = Gem::Platform::RUBY
   s.authors     = ["Daniel Cooper"]
