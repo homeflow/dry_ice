@@ -8,7 +8,7 @@ module HTTParty #:nodoc:
   # == Caching for HTTParty
   # See documentation in HTTParty::Icebox::ClassMethods.cache
   #
-  module Icebox
+  module DryIce
 
     module ClassMethods
 

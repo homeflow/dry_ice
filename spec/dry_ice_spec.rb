@@ -2,7 +2,7 @@ require 'spec_helper.rb'
 require 'active_support'
 
 
-describe HTTParty::Icebox do
+describe HTTParty::DryIce do
 
   context "when being set up" do
 
@@ -27,14 +27,13 @@ describe HTTParty::Icebox do
   context "when performing a request" do
 
 
-    it "should not try and read reuqests that have not been cached" do
+    it "should not use read to check existance" do
 
       class MockApi
         cache(ActiveSupport::Cache::NullStore.new)
       end
 
-       ActiveSupport::Cache::NullStore.any_instance.should_receive(:exist?).once.and_call_original
-       ActiveSupport::Cache::NullStore.any_instance.should_not_receive(:read)
+       ActiveSupport::Cache::NullStore.any_instance.should_receive(:read)
 
        stub_request(:get, "http://example.com/").to_return(:status => 200, :body => "test", :headers => {})     
       
@@ -63,13 +62,13 @@ describe HTTParty::Icebox do
 end
 
 
-describe HTTParty::Icebox::IceCache do
+describe HTTParty::DryIce::IceCache do
 
 
   it "should be able to marshel and store a HTTParty request" do
     stub_request(:get, "http://example.com/").to_return(:status => 200, :body => "hello world", :headers => {:cache_control => 'max-age=0'})     
     response = MockApi.get('/')
-    cache = HTTParty::Icebox::IceCache.new(ActiveSupport::Cache::NullStore.new)
+    cache = HTTParty::DryIce::IceCache.new(ActiveSupport::Cache::NullStore.new)
 
     serialised = cache.serialize_response(response)
     res = cache.build_response(serialised)
