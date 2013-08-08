@@ -67,8 +67,8 @@ module HTTParty #:nodoc:
           return get_without_caching(path, options) unless get_cache
           key = path.downcase # this makes a copy of path
           key << options[:query].to_s if defined? options[:query]
-          if get_cache.exist?(key) 
-            return get_cache.get(key)
+          if res = get_cache.read(key) 
+            return res
           else
             response =  get_without_caching(path, options)
             if cache_for = self.cache_response?(response)
