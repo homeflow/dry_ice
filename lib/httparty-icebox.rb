@@ -34,11 +34,14 @@ module HTTParty #:nodoc:
       #   # Use your own cache store (see +AbstractStore+ class below)
       #   cache :store => 'memcached', :timeout => 600, :server => '192.168.1.1:1001'
       #
-      def cache(options={})
-        options[:store]   ||= 'memory'
-        options[:timeout] ||= 60
-        logger = options[:logger]
-        @cache ||= Cache.new( options.delete(:store), options )
+      def cache(cache)
+        return @cache = nil unless cache
+        raise "cache instance must respond_to #read, #write and #delete" unless cache.respond_to?(:read) && cache.respond_to?(:write) && cache.respond_to?(:delete)
+        @cache = IceCache.new(cache)
+      end
+
+      def get_cache
+        @cache || false
       end
 
     end
@@ -61,29 +64,29 @@ module HTTParty #:nodoc:
         # Get response from cache, if available
         #
         def self.get_with_caching(path, options={})
+          return get_without_caching(path, options) unless get_cache
           key = path.downcase # this makes a copy of path
           key << options[:query].to_s if defined? options[:query]
-          if cache.exists?(key) and not cache.stale?(key)
-            Cache.logger.debug "CACHE -- GET #{path}#{options[:query]}"
-            return cache.get(key)
+          if get_cache.exist?(key) 
+            return get_cache.get(key)
           else
-            cache.cleanup!(key)
-            Cache.logger.debug "/!\\ NETWORK -- GET #{path}#{options[:query]}"
-
-            begin
-              response = get_without_caching(path, options)
-              timeout = response.headers['cache-control'] && response.headers['cache-control'][/max-age=(\d+)/, 1].to_i()
-              cache.set(key, response, :timeout => timeout) if response.code.to_s == "200" # this works for string and integer response codes
+            response =  get_without_caching(path, options)
+            if cache_for = self.cache_response?(response)
+              get_cache.write(key,response, :expires_in => cache_for)
               return response
-            rescue
-              if cache.exists?(key)
-                Cache.logger.debug "!!! NETWORK FAILED -- RETURNING STALE CACHE"
-                return cache.get(key, true)
-              else
-                raise
-              end
+            else
+              return response
             end
           end
+        end
+
+        #returns falsy if the response should not be cached - otherwise returns the timeout in seconds to cache for
+        def self.cache_response?(response)
+           return false if !response.body
+           return false unless response.code.to_s == "200"
+           timeout = response.headers['cache-control'] && response.headers['cache-control'][/max-age=(\d+)/, 1].to_i()
+           return false unless timeout && timeout != 0
+           return timeout
         end
 
         # Redefine original HTTParty +get+ method to use cache
@@ -95,171 +98,52 @@ module HTTParty #:nodoc:
       end
     end
 
-    # === Cache container
-    #
-    # Pass a store name ('memory', etc) to new
-    #
-    class Cache
-      attr_accessor :store
+    class IceCache
 
-      def initialize(store, options={})
-        self.class.logger = options[:logger]
-        @store = self.class.lookup_store(store).new(options)
+      require 'msgpack'
+
+      def initialize(cache)
+        @cache = cache
       end
 
-      def get(key, force=false)
-        @store.get encode(key) if !stale?(key) || force
+      def write(name, value, options = {})
+        @cache.write(name, serialize_response(value), options)
       end
 
-      def cleanup!(key)
-        @store.cleanup!(encode(key))
+
+      def serialize_response(response)
+        headers = response.headers.dup
+        body = response.body.dup
+        [headers,body].to_msgpack 
       end
 
-      def set(key, value, options={})
-        @store.set encode(key), value, options
+      def build_response(serialized_response)
+        res = MessagePack.unpack(serialized_response)
+        CachedHTTPartyResponse.new(res[0], res[1])
       end
 
-      def exists?(key)
-        @store.exists? encode(key)
+      def read(*args)
+        found = @cache.read(*args)
+        build_response(found) if found
       end
 
-      def stale?(key)
-        @store.stale? encode(key)
+      def exist?(*args)
+        @cache.exist?(*args)
       end
 
-      def self.logger; @logger || default_logger; end
-      def self.default_logger; logger = ::Logger.new(STDERR); end
 
-      # Pass a filename (String), IO object, Logger instance or +nil+ to silence the logger
-      def self.logger=(device); @logger = device.kind_of?(::Logger) ? device : ::Logger.new(device); end
-
-      private
-
-      # Return store class based on passed name
-      def self.lookup_store(name)
-        store_name = "#{name.capitalize}Store"
-        return Store::const_get(store_name)
-      rescue NameError => e
-        raise Store::StoreNotFound, "The cache store '#{store_name}' was not found. Did you load any such class?"
-      end
-
-      def encode(key); Digest::MD5.hexdigest(key); end
     end
 
+    class CachedHTTPartyResponse
 
-    # === Cache stores
-    #
-    module Store
+      attr_accessor :headers, :body
 
-      class StoreNotFound < StandardError; end #:nodoc:
-
-      # ==== Abstract Store
-      # Inherit your store from this class
-      # *IMPORTANT*: Do not forget to call +super+ in your +initialize+ method!
-      #
-      class AbstractStore
-        def initialize(options={})
-          raise ArgumentError, "You need to set the :timeout parameter" unless options[:timeout]
-          @timeout = options[:timeout]
-          message =  "Cache: Using #{self.class.to_s.split('::').last}"
-          message << " in location: #{options[:location]}" if options[:location]
-          message << " with timeout #{options[:timeout]} sec"
-          Cache.logger.info message unless options[:logger].nil?
-          return self
-        end
-        %w{set get exists? stale?}.each do |method_name|
-          define_method(method_name) { raise NoMethodError, "Please implement method #{method_name} in your store class" }
-        end
-
-        def cleanup!(key)
-          #noop
-        end
+      def initialize(headers, body)
+        @headers, @body = headers, body
       end
 
-      # ==== Store objects in memory
-      # See HTTParty::Icebox::ClassMethods.cache
-      #
-      # NB. For in memory make sure to make copies of the values in case
-      #     clients of this store perform destructive actions on the values.
-      class MemoryStore < AbstractStore
-        def initialize(options={})
-          super; @store = {}; self
-        end
-        def set(key, value, options={})
-          Cache.logger.info("Cache: set (#{key})")
-          value_timeout = options[:timeout]
-          @store[key] = [Time.now, value_timeout, value.deep_dup]
-          true
-        end
-        def get(key)
-          data = @store[key][2].deep_dup
-          Cache.logger.info("Cache: #{data.nil? ? "miss" : "hit"} (#{key})")
-          data
-        end
-        def exists?(key)
-          !@store[key].nil?
-        end
-        def stale?(key)
-          return true unless exists?(key)
-          Time.now - created(key) > value_timeout(key)
-        end
-        private
-        def created(key)
-          @store[key][0]
-        end
-        def value_timeout(key)
-          @store[key][1]
-        end
-      end
-
-      # ==== Store objects on the filesystem
-      # See HTTParty::Icebox::ClassMethods.cache
-      #
-      # TODO implement a timeout on a per value basis, like the MemoryStore's `value_timeout`
-      class FileStore < AbstractStore
-        def initialize(options={})
-          super
-          options[:location] ||= Dir::tmpdir
-          @path = Pathname.new( options[:location] )
-          FileUtils.mkdir_p( @path )
-          self
-        end
-
-        def set(key, value, options = {})
-          Cache.logger.info("Cache: set (#{key})")
-          timeout_value = options[:timeout] || @timeout
-          File.open( @path.join(key), 'w' ) { |file| file <<  Base64.encode64(Marshal.dump([Time.now, timeout_value, value.deep_dup])) }
-          true
-        end
-
-        def get(key)
-          data = load_data(key)
-          Cache.logger.info("Cache: #{data.nil? ? "miss" : "hit"} (#{key})")
-          data[2]
-        end
-
-        def load_data(key)
-          data = Marshal.load(Base64.decode64(File.read( @path.join(key))))
-        end
-
-        def exists?(key)
-          File.exists?( @path.join(key) )
-        end
-
-        def stale?(key)
-          return true unless exists?(key)
-          data = load_data(key)
-          (Time.now - data[0]) > data[1]
-
-        end
-
-        def cleanup!(key)
-          Cache.logger.info("Cache cleanup: #{key}")
-          File.delete(@path.join(key)) if exists?(key)
-        end
-
-      end
     end
+
   end
 end
 
