@@ -1,16 +1,8 @@
-# HTTParty-Icebox - Caching for HTTParty
-
-## Deprecation notice
-HTTParty-Icebox is no longer being maintained.
-
-As I haven't used HTTParty for a long time, and don't like feeling bad about neglecting HTTParty-Icebox, I've decided to deprecate it. Check out [CacheBar](https://github.com/vigetlabs/cachebar) instead.
-
-If you're interested in taking over let me know. I should still have my unfinished rewrite somewhere.
-
+# DryIce - Caching for HTTParty
 
 ## Description
 
-Cache responses in HTTParty models
+Cache responses in HTTParty models. Every response from a resource which has a non 0 max-age header will be cached for the appropriate amount of time in the cache you provide it
 
 ## Installation
 
@@ -18,45 +10,35 @@ Cache responses in HTTParty models
 
 You can install the latest Film Buff gem using RubyGems
 
-    gem install httparty-icebox
+    gem install dry_ice
 
 ### GitHub
 
 Alternatively you can check out the latest code directly from Github
 
-    git clone http://github.com/sachse/httparty-icebox.git
+    git clone http://github.com/homeflow/dry_ice.git
 
 ## Usage
 
-
-
-### Examples
-
-Enable caching with default values:
-
-    require 'httparty-icebox'
+Any class which includes the `HTTParty` module can include `HTTParty::DryIce` and get access to a cache class method.
     
-    include HTTParty::Icebox
-    
-    cache
-    # Use HTTParty's .get method as usual, the response will now be cached
-    cached_response = HTTParty.get("https://github.com/sachse/httparty-icebox")
+    class AnAPI
 
-Cache responses for 5 minutes on the system in the directory "/tmp":
+      include HTTParty
+      include HTTParty::DryIce
+      base_uri 'example.com'
+      
+      cache Rails.cache
 
-    require 'httparty-icebox'
-    
-    include HTTParty::Icebox
-    
-    cache :store => 'file', :timeout => 300, :location => '/tmp/'
-    # Use HTTParty's .get method as usual, the response will now be cached
-    cached_response = HTTParty.get("https://github.com/sachse/httparty-icebox")
+    end
 
-## Authors
+The `cache` method accepts any instance which quacks like a [ActiveSupport cache](http://api.rubyonrails.org/classes/ActiveSupport/Cache/MemoryStore.html). That means you can use the built in Rails caches, something like [Redis Store](https://github.com/jodosha/redis-store) or your own custom rolled class as long as it responds to the methods: 
 
-- [Kristoffer Sachse](https://github.com/sachse) (Current maintainer)
+   - read
+   - write (taking an option :expires_in => seconds)
+   - exit?
+   - delete
 
-- [Karel Minarik](http://karmi.cz) (Original creator through [a gist](https://gist.github.com/209521/))
 
 ## Contribute
 
@@ -65,6 +47,11 @@ a pull request to me. I'll gladly consider any help or ideas.
 
 ### Contributors
 
+- [Daniel Cooper](http://github.com/danielcooper) - For homeflow.co.uk
+
+This project was based off the excellent httparty-icebox gem: https://github.com/sachse/httparty-icebox. It's contributors are listed below.
+
+- [Karel Minarik](http://karmi.cz) (Original creator through [a gist](https://gist.github.com/209521/))
 - [Martyn Loughran](https://github.com/mloughran) - Major parts of this code are based on the architecture of ApiCache.
 - [David Heinemeier Hansson](https://github.com/dhh) - Other parts are inspired by the ActiveSupport::Cache in Ruby On Rails.
 - [Amit Chakradeo](https://github.com/amit) - For pointing out response objects have to be stored marshalled on FS.
