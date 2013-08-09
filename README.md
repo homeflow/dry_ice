@@ -2,7 +2,9 @@
 
 ## Description
 
-Cache responses in HTTParty models. Every response from a resource which has a non 0 max-age header will be cached for the appropriate amount of time in the cache you provide it
+Cache responses in HTTParty models. Every response from a resource which has a non 0 max-age header will be cached for the appropriate amount of time in the cache you provide it.
+
+Based off https://github.com/sachse/httparty-icebox
 
 ## Installation
 
