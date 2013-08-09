@@ -8,7 +8,7 @@ Gem::Specification.new do |s|
   s.platform    = Gem::Platform::RUBY
   s.authors     = ["Daniel Cooper"]
   s.email       = ["daniel@14lines.com"]
-  s.homepage    = "https://github.com/homeflow/dryice"
+  s.homepage    = "https://github.com/homeflow/dry_ice"
   s.summary     = %q{Caching for HTTParty}
   s.description = %q{Cache responses in HTTParty models}
 
