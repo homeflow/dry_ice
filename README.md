@@ -1,5 +1,7 @@
 # DryIce - Caching for HTTParty
 
+[![Code Climate](https://codeclimate.com/repos/5204fbf4c7f3a324e901d957/badges/4da6100b52ac17461549/gpa.png)](https://codeclimate.com/repos/5204fbf4c7f3a324e901d957/feed)
+
 ## Description
 
 Cache responses in HTTParty models. Every response from a resource which has a non 0 max-age header will be cached for the appropriate amount of time in the cache you provide it.
