@@ -11,6 +11,7 @@ Gem::Specification.new do |s|
   s.homepage    = "https://github.com/homeflow/dry_ice"
   s.summary     = %q{Caching for HTTParty}
   s.description = %q{Cache responses in HTTParty models}
+  s.license     = 'MIT'
 
   s.add_dependency("httparty", "~> 0.9.0")
   s.add_dependency("msgpack")
