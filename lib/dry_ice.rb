@@ -114,12 +114,13 @@ module HTTParty #:nodoc:
       def serialize_response(response)
         headers = response.headers.dup
         body = response.body.dup
-        [headers,body].to_msgpack 
+        parsed_response = response.parsed_response
+        [headers,body,parsed_response].to_msgpack 
       end
 
       def build_response(serialized_response)
         res = MessagePack.unpack(serialized_response)
-        CachedHTTPartyResponse.new(res[0], res[1])
+        CachedHTTPartyResponse.new(res[0], res[1], res[2])
       end
 
       def read(*args)
@@ -136,14 +137,17 @@ module HTTParty #:nodoc:
 
     class CachedHTTPartyResponse
 
-      attr_accessor :headers, :body
+      attr_accessor :headers, :body, :parsed_response
 
-      def initialize(headers, body)
-        @headers, @body = headers, body
+      def initialize(headers, body, parsed_response)
+        @headers, @body, @parsed_response = headers, body, parsed_response
       end
 
     end
 
   end
 end
+
+
+
 
