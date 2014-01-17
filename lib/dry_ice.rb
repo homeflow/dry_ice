@@ -34,10 +34,10 @@ module HTTParty #:nodoc:
       #   # Use your own cache store (see +AbstractStore+ class below)
       #   cache :store => 'memcached', :timeout => 600, :server => '192.168.1.1:1001'
       #
-      def cache(cache)
+      def cache(cache, options = {})
         return @cache = nil unless cache
         raise "cache instance must respond_to #read, #write and #delete" unless cache.respond_to?(:read) && cache.respond_to?(:write) && cache.respond_to?(:delete)
-        @cache = IceCache.new(cache)
+        @cache = IceCache.new(cache, options)
       end
 
       def get_cache
@@ -102,7 +102,8 @@ module HTTParty #:nodoc:
 
       require 'msgpack'
 
-      def initialize(cache)
+      def initialize(cache, options = {})
+        @options = {:serialize => true}.merge(options)
         @cache = cache
       end
 
@@ -115,12 +116,18 @@ module HTTParty #:nodoc:
         headers = response.headers.dup
         body = response.body.dup
         parsed_response = response.parsed_response
-        [headers,body,parsed_response].to_msgpack 
+        if @options[:serialize]
+          [headers,body,parsed_response].to_msgpack
+        else
+          [headers,body,parsed_response]
+        end
       end
 
       def build_response(serialized_response)
-        res = MessagePack.unpack(serialized_response)
-        CachedHTTPartyResponse.new(res[0], res[1], res[2])
+        if @options[:serialize]
+          serialized_response = MessagePack.unpack(serialized_response)
+        end
+        CachedHTTPartyResponse.new(serialized_response[0], serialized_response[1], serialized_response[2])
       end
 
       def read(*args)
