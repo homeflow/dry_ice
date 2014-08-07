@@ -13,7 +13,7 @@ Gem::Specification.new do |s|
   s.description = %q{Cache responses in HTTParty models}
   s.license     = 'MIT'
 
-  s.add_dependency("httparty", "~> 0.9.0")
+  s.add_dependency("httparty", "~> 0.13.1")
   s.add_dependency("msgpack")
 
   s.files         = `git ls-files`.split("\n")
