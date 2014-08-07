@@ -1,6 +1,6 @@
 # DryIce - Caching for HTTParty
 
-[![Code Climate](https://codeclimate.com/repos/5204fbf4c7f3a324e901d957/badges/4da6100b52ac17461549/gpa.png)](https://codeclimate.com/repos/5204fbf4c7f3a324e901d957/feed)
+[![Code Climate](https://codeclimate.com/github/homeflow/dry_ice/badges/gpa.svg)](https://codeclimate.com/github/homeflow/dry_ice)
 
 ## Description
 
