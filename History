@@ -1,3 +1,11 @@
+== 0.1.1 2014-08-07
+
+* Update httparty dependencey
+
+== 0.1
+* New fork: Dryice
+
+
 == 0.0.4 2012-01-03
 * minor enhancements
   * Update gemspec to depend on HTTParty 0.8.X to fix YAML issues.
@@ -10,7 +18,7 @@
 * minor enhancements
   * Return a cached result if network fails. [Andreas Garnæs]
 
-== 0.0.1 
+== 0.0.1
 
 * major enhancements
   * Initial release.
